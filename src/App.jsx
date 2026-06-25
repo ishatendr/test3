@@ -3124,10 +3124,19 @@ const CATEGORY_LIST = [
 const LS_WRONG = "medApp_wrongIds";
 const LS_HISTORY = "medApp_history";
 const LS_PROGRESS = "medApp_progress"; // {mode: string, index: number}
+const LS_STAR = "medApp_starIds";
 
 // ============================================================
 // ユーティリティ
 // ============================================================
+function loadStarIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_STAR) || "[]")); }
+  catch { return new Set(); }
+}
+function saveStarIds(set) {
+  localStorage.setItem(LS_STAR, JSON.stringify([...set]));
+}
+
 function loadWrongIds() {
   try { return new Set(JSON.parse(localStorage.getItem(LS_WRONG) || "[]")); }
   catch { return new Set(); }
@@ -3168,6 +3177,10 @@ function buildQueue(mode, allQuestions, wrongIds) {
   if (mode === "review") {
     const wrong = allQuestions.filter((q) => wrongIds.has(q.id));
     return wrong.length > 0 ? shuffle(wrong) : [];
+  }
+  if (mode === "star") {
+    const starred = allQuestions.filter((q) => starIds.has(q.id));
+    return starred.length > 0 ? shuffle(starred) : [];
   }
   if (mode.startsWith("cat:")) {
     const catName = mode.slice(4);
@@ -3229,6 +3242,7 @@ export default function App() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [sessionResults, setSessionResults] = useState([]);
   const [wrongIds, setWrongIds] = useState(loadWrongIds);
+  const [starIds, setStarIds] = useState(loadStarIds);
   const [history, setHistory] = useState(loadHistory);
 
   const [voicePhase, setVoicePhase] = useState("idle");
@@ -3334,6 +3348,16 @@ export default function App() {
       if (correct) next[qId].correct++;
       else next[qId].wrong++;
       saveHistory(next);
+      return next;
+    });
+  }
+
+  function toggleStar(qId) {
+    setStarIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(qId)) next.delete(qId);
+      else next.add(qId);
+      saveStarIds(next);
       return next;
     });
   }
@@ -3444,7 +3468,7 @@ export default function App() {
   // ============================================================
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
-      {screen === "home" && <HomeScreen onStart={startQuiz} wrongCount={wrongIds.size} />}
+      {screen === "home" && <HomeScreen onStart={startQuiz} wrongCount={wrongIds.size} starCount={starIds.size} />}
       {screen === "quiz" && currentQ && (
         <QuizScreen
           question={currentQ}
@@ -3467,6 +3491,8 @@ export default function App() {
           isResume={qIndex > 0 && sessionResults.length === 0}
           onRestart={() => startQuiz(mode, false, true)}
           onJump={(idx) => { setQIndex(idx); setSelectedSet(new Set()); setConfirmed(false); setShowExplanation(false); }}
+          isStarred={starIds.has(currentQ?.id)}
+          onToggleStar={() => toggleStar(currentQ?.id)}
         />
       )}
       {screen === "result" && (
@@ -3480,7 +3506,7 @@ export default function App() {
 // ============================================================
 // HomeScreen
 // ============================================================
-function HomeScreen({ onStart, wrongCount }) {
+function HomeScreen({ onStart, wrongCount, starCount }) {
   const [selectedMode, setSelectedMode] = useState("year2024");
   const [tab, setTab] = useState("year"); // "year" | "category"
   const count2024 = SAMPLE_QUESTIONS.filter((q) => q.year === "2024").length;
@@ -3497,6 +3523,7 @@ function HomeScreen({ onStart, wrongCount }) {
     { id: "year2023", label: "第16回（2023年）", icon: "📋", desc: `問1から順番に・全${count2023}問` },
     { id: "year2022", label: "第15回（2022年）", icon: "📋", desc: `問1から順番に・全${count2022}問` },
     { id: "year2021", label: "第14回（2021年）", icon: "📋", desc: `問1から順番に・全${count2021}問` },
+    { id: "star", label: "⭐ 要確認", icon: "⭐", desc: `マークした問題のみ（${starCount}問）` },
     { id: "random", label: "ランダム", icon: "🔀", desc: "全問題からランダム出題" },
     { id: "review", label: "復習モード", icon: "🔁", desc: `間違えた問題のみ（${wrongCount}問）` },
   ];
@@ -3571,6 +3598,11 @@ function HomeScreen({ onStart, wrongCount }) {
         </div>
         <div className="w-px bg-slate-700" />
         <div>
+          <p className="text-2xl font-bold text-slate-50">{starCount}</p>
+          <p className="text-xs text-slate-500">⭐要確認</p>
+        </div>
+        <div className="w-px bg-slate-700" />
+        <div>
           <p className="text-lg font-bold text-slate-50">第14〜17回</p>
           <p className="text-xs text-slate-500">精神科専門医</p>
         </div>
@@ -3587,6 +3619,7 @@ function QuizScreen({
   selectedSet, confirmed, showExplanation, correctSet, requiredCount,
   voiceMode, voicePhase, voiceListening, voiceError,
   onToggle, onConfirm, onNext, onStopVoice, onBack, isResume, onRestart, onJump,
+  isStarred, onToggleStar,
 }) {
   const [jumpInput, setJumpInput] = useState("");
   const [showJump, setShowJump] = useState(false);
@@ -3638,6 +3671,7 @@ function QuizScreen({
         <div className="flex items-center gap-1">
           <button onClick={onBack} className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">← 戻る</button>
           {isResume && <button onClick={onRestart} className="text-xs px-2 py-1 rounded-lg bg-slate-700 text-slate-400 hover:bg-slate-600 transition-colors">最初から</button>}
+          <button onClick={onToggleStar} className={`text-2xl transition-all active:scale-95 ${isStarred ? "opacity-100" : "opacity-30"}`} title="要確認にマーク">⭐</button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-400">
