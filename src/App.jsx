@@ -3159,7 +3159,7 @@ function shuffle(arr) {
   }
   return a;
 }
-function buildQueue(mode, allQuestions, wrongIds) {
+function buildQueue(mode, allQuestions, wrongIds, starIds = new Set()) {
   const byNumber = (a, b) => a.number - b.number || a.id.localeCompare(b.id);
   if (mode === "year2024") {
     return allQuestions.filter((q) => q.year === "2024").sort(byNumber);
@@ -3270,9 +3270,9 @@ export default function App() {
     stopSpeech();
     setMode(selectedMode);
     setVoiceMode(selectedVoice);
-    const q = buildQueue(selectedMode, SAMPLE_QUESTIONS, wrongIds);
+    const q = buildQueue(selectedMode, SAMPLE_QUESTIONS, wrongIds, starIds);
     if (q.length === 0) {
-      alert("復習問題がありません。まず問題を解いて間違えた問題を作成してください。");
+      alert(selectedMode === "star" ? "⭐要確認の問題がありません。問題画面の⭐ボタンでマークしてください。" : selectedMode === "review" ? "復習問題がありません。まず問題を解いて間違えた問題を作成してください。" : "問題がありません。");
       return;
     }
     setQueue(q);
