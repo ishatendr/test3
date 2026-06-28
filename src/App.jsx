@@ -2117,8 +2117,8 @@ const SAMPLE_QUESTIONS = [
     id: "2021-Q080", year: "2021", number: 80,
     question: "わが国において、服用中は授乳を避けるべき薬剤はどれか、1つ選べ。",
     options: ["ルラシドン", "バルプロ酸", "ラモトリギン", "アリピプラゾール", "クエチアピン徐放性製剤"],
-    correctAnswer: [0, 4],
-    explanation: ""
+    correctAnswer: 0,
+    explanation: "日本の添付文書上、ルラシドン（ラツーダ）は「授乳を避けさせること」と明記されています（禁忌に準ずる扱い）。動物実験（ラット）で乳汁への移行が報告されており、ヒトでの安全性が十分に確立されていないためです。一方、他の選択肢（バルプロ酸、ラモトリギン、アリピプラゾール、クエチアピン）の添付文書は、2019年の記載要領改訂に前後して順次表現が見直されており、現在は主に「授乳婦への投与は、治療上の有益性及び母乳栄養の有益性を考慮し、授乳の継続又は中止を検討すること」という、いわゆる「ベネフィット・リスクを勘案した個別判断（原則禁忌ではない）」の記載になっています。"
   },
   {
     id: "2021-Q081", year: "2021", number: 81,
@@ -3127,6 +3127,17 @@ const LS_PROGRESS = "medApp_progress"; // {mode: string, index: number}
 const LS_STAR = "medApp_starIds";
 
 // ============================================================
+// 音声解説ファイル設定
+// ※ public/audio/ フォルダに m4a ファイルを置いてください
+// ============================================================
+const AUDIO_FILES = [
+  { cat: "心理検査・症候群", file: "https://drive.google.com/uc?export=download&id=1T17TLfqW5Rs4f6hooVBDG2X5hUfCt_AZ" },
+  { cat: "歴史・法律", file: "https://drive.google.com/uc?export=download&id=1ieZrUXbXdoJpQPDvgvEjm1t-DZouUrzk" },
+  // 追加する場合はここに書いてください
+  // { cat: "分野名", file: "https://drive.google.com/uc?export=download&id=ファイルID" },
+];
+
+// ============================================================
 // ユーティリティ
 // ============================================================
 function loadStarIds() {
@@ -3230,6 +3241,7 @@ function stopSpeech() {
 // ============================================================
 export default function App() {
   const [screen, setScreen] = useState("home");
+  const [navTab, setNavTab] = useState("year"); // "year" | "category" | "lecture"
   const [mode, setMode] = useState(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [queue, setQueue] = useState([]);
@@ -3468,7 +3480,7 @@ export default function App() {
   // ============================================================
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
-      {screen === "home" && <HomeScreen onStart={startQuiz} wrongCount={wrongIds.size} starCount={starIds.size} />}
+      {screen === "home" && <HomeScreen onStart={startQuiz} wrongCount={wrongIds.size} starCount={starIds.size} navTab={navTab} onNavTab={setNavTab} />}
       {screen === "quiz" && currentQ && (
         <QuizScreen
           question={currentQ}
@@ -3506,9 +3518,12 @@ export default function App() {
 // ============================================================
 // HomeScreen
 // ============================================================
-function HomeScreen({ onStart, wrongCount, starCount }) {
+function HomeScreen({ onStart, wrongCount, starCount, navTab, onNavTab }) {
   const [selectedMode, setSelectedMode] = useState("year2024");
-  const [tab, setTab] = useState("year"); // "year" | "category"
+  const [selectedCat, setSelectedCat] = useState(CATEGORY_LIST[0]);
+  const [playingCat, setPlayingCat] = useState(null);
+  const audioRef = useRef(null);
+
   const count2024 = SAMPLE_QUESTIONS.filter((q) => q.year === "2024").length;
   const count2023 = SAMPLE_QUESTIONS.filter((q) => q.year === "2023").length;
   const count2022 = SAMPLE_QUESTIONS.filter((q) => q.year === "2022").length;
@@ -3518,7 +3533,7 @@ function HomeScreen({ onStart, wrongCount, starCount }) {
     return acc;
   }, {});
 
-  const modes = [
+  const yearModes = [
     { id: "year2024", label: "第17回（2024年）", icon: "📋", desc: `問1から順番に・全${count2024}問` },
     { id: "year2023", label: "第16回（2023年）", icon: "📋", desc: `問1から順番に・全${count2023}問` },
     { id: "year2022", label: "第15回（2022年）", icon: "📋", desc: `問1から順番に・全${count2022}問` },
@@ -3527,84 +3542,145 @@ function HomeScreen({ onStart, wrongCount, starCount }) {
     { id: "random", label: "ランダム10問", icon: "🔀", desc: "全問題からランダム10問" },
     { id: "review", label: "復習モード", icon: "🔁", desc: `間違えた問題のみ（${wrongCount}問）` },
   ];
+
+  function handlePlayAudio(cat, file) {
+    if (playingCat === cat) {
+      audioRef.current?.pause();
+      setPlayingCat(null);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = file;
+        audioRef.current.play().catch(() => {});
+      }
+      setPlayingCat(cat);
+    }
+  }
+
+  const TABS = [
+    { id: "year", label: "年度別", icon: "📅" },
+    { id: "category", label: "分野別問題", icon: "🏷️" },
+    { id: "lecture", label: "分野別解説", icon: "🎵" },
+  ];
+
   return (
-    <div className="max-w-lg mx-auto px-4 py-8 pb-12">
-      <div className="text-center mb-10">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 mb-4">
-          <span className="text-3xl">🧠</span>
+    <div className="max-w-lg mx-auto pb-24" style={{minHeight:"100vh"}}>
+      {/* ヘッダー */}
+      <div className="text-center px-4 pt-8 pb-4">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 mb-3">
+          <span className="text-2xl">🧠</span>
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-50">精神科専門医試験</h1>
         <p className="text-slate-400 mt-1 text-sm">第14〜17回 一問一答・解説アプリ</p>
+        {/* 統計 */}
+        <div className="flex justify-center gap-5 mt-4 text-center">
+          <div><p className="text-xl font-bold text-slate-50">{SAMPLE_QUESTIONS.length}</p><p className="text-xs text-slate-500">総問題数</p></div>
+          <div className="w-px bg-slate-700" />
+          <div><p className="text-xl font-bold text-slate-50">{wrongCount}</p><p className="text-xs text-slate-500">要復習</p></div>
+          <div className="w-px bg-slate-700" />
+          <div><p className="text-xl font-bold text-slate-50">{starCount}</p><p className="text-xs text-slate-500">⭐要確認</p></div>
+        </div>
       </div>
-      <div className="mb-6">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">出題モード</p>
 
-        {/* タブ切り替え */}
-        <div className="flex gap-2 mb-3">
-          {[["year", "📅 年度別・全問"], ["category", "🏷️ 分野別"]].map(([t, label]) => (
-            <button key={t} onClick={() => { setTab(t); setSelectedMode(t === "year" ? "year2024" : ("cat:" + CATEGORY_LIST[0])); }}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${tab === t ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300" : "bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-800"}`}>
-              {label}
+      {/* コンテンツ */}
+      <div className="px-4">
+
+        {/* ── タブ1: 年度別 ── */}
+        {navTab === "year" && (
+          <div>
+            <div className="space-y-2 mb-5">
+              {yearModes.map((m) => (
+                <button key={m.id} onClick={() => setSelectedMode(m.id)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${selectedMode === m.id ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300" : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-800"}`}>
+                  <span className="text-2xl">{m.icon}</span>
+                  <div>
+                    <p className="font-semibold text-base">{m.label}</p>
+                    <p className="text-xs text-slate-400">{m.desc}</p>
+                  </div>
+                  {selectedMode === m.id && <span className="ml-auto text-emerald-400 text-lg">✓</span>}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => onStart(selectedMode, false)}
+              className="w-full py-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 transition-all font-bold text-slate-900 text-lg shadow-lg shadow-emerald-500/20">
+              演習を開始する
+            </button>
+          </div>
+        )}
+
+        {/* ── タブ2: 分野別問題 ── */}
+        {navTab === "category" && (
+          <div>
+            <div className="space-y-2 mb-5">
+              {CATEGORY_LIST.filter(cat => catCounts[cat] > 0).map((cat) => (
+                <button key={cat} onClick={() => setSelectedCat(cat)}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${selectedCat === cat ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300" : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-800"}`}>
+                  <span className="font-semibold text-sm">{cat}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${selectedCat === cat ? "border-emerald-500/50 text-emerald-400" : "border-slate-600 text-slate-500"}`}>
+                      {catCounts[cat]}問
+                    </span>
+                    {selectedCat === cat && <span className="text-emerald-400">✓</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => onStart("cat:" + selectedCat, false)}
+              className="w-full py-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 transition-all font-bold text-slate-900 text-lg shadow-lg shadow-emerald-500/20">
+              {selectedCat} を演習する
+            </button>
+          </div>
+        )}
+
+        {/* ── タブ3: 分野別解説 ── */}
+        {navTab === "lecture" && (
+          <div>
+            <audio ref={audioRef} onEnded={() => setPlayingCat(null)} />
+            {AUDIO_FILES.length === 0 ? (
+              <div className="text-center py-16 px-4">
+                <p className="text-4xl mb-4">🎵</p>
+                <p className="text-slate-300 font-semibold mb-2">音声解説を準備中</p>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  分野別の音声解説ファイルを順次追加予定です。
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {AUDIO_FILES.map(({ cat, file }) => (
+                  <div key={cat} className={`p-4 rounded-2xl border transition-all ${playingCat === cat ? "bg-emerald-500/15 border-emerald-500/50" : "bg-slate-800/60 border-slate-700/50"}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`font-semibold text-sm ${playingCat === cat ? "text-emerald-300" : "text-slate-200"}`}>{cat}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{catCounts[cat] || 0}問収録</p>
+                      </div>
+                      <button onClick={() => handlePlayAudio(cat, file)}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all active:scale-95 ${playingCat === cat ? "bg-emerald-500 text-slate-900" : "bg-slate-700 text-slate-200 hover:bg-slate-600"}`}>
+                        {playingCat === cat ? "⏸" : "▶"}
+                      </button>
+                    </div>
+                    {playingCat === cat && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="animate-pulse text-emerald-400 text-xs">● 再生中</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ボトムタブバー */}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700/50" style={{paddingBottom:"env(safe-area-inset-bottom)"}}>
+        <div className="max-w-lg mx-auto flex">
+          {TABS.map((t) => (
+            <button key={t.id} onClick={() => onNavTab(t.id)}
+              className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors ${navTab === t.id ? "text-emerald-400" : "text-slate-500"}`}>
+              <span className="text-xl">{t.icon}</span>
+              <span className="text-xs font-medium">{t.label}</span>
             </button>
           ))}
-        </div>
-
-        {/* 年度別タブ */}
-        {tab === "year" && (
-          <div className="space-y-2">
-            {modes.map((m) => (
-              <button key={m.id} onClick={() => setSelectedMode(m.id)}
-                className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${selectedMode === m.id ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300" : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-800"}`}>
-                <span className="text-2xl">{m.icon}</span>
-                <div>
-                  <p className="font-semibold text-base">{m.label}</p>
-                  <p className="text-xs text-slate-400">{m.desc}</p>
-                </div>
-                {selectedMode === m.id && <span className="ml-auto text-emerald-400 text-lg">✓</span>}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* 分野別タブ */}
-        {tab === "category" && (
-          <div className="space-y-2">
-            {CATEGORY_LIST.filter(cat => catCounts[cat] > 0).map((cat) => (
-              <button key={cat} onClick={() => setSelectedMode("cat:" + cat)}
-                className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${selectedMode === "cat:" + cat ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300" : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-800"}`}>
-                <span className="font-semibold text-sm">{cat}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full border ${selectedMode === "cat:" + cat ? "border-emerald-500/50 text-emerald-400" : "border-slate-600 text-slate-500"}`}>
-                  {catCounts[cat]}問
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <button onClick={() => onStart(selectedMode, false)}
-        className="w-full py-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 transition-all font-bold text-slate-900 text-lg shadow-lg shadow-emerald-500/20">
-        演習を開始する
-      </button>
-      <div className="mt-6 flex justify-center gap-6 text-center">
-        <div>
-          <p className="text-2xl font-bold text-slate-50">{SAMPLE_QUESTIONS.length}</p>
-          <p className="text-xs text-slate-500">総問題数</p>
-        </div>
-        <div className="w-px bg-slate-700" />
-        <div>
-          <p className="text-2xl font-bold text-slate-50">{wrongCount}</p>
-          <p className="text-xs text-slate-500">要復習</p>
-        </div>
-        <div className="w-px bg-slate-700" />
-        <div>
-          <p className="text-2xl font-bold text-slate-50">{starCount}</p>
-          <p className="text-xs text-slate-500">⭐要確認</p>
-        </div>
-        <div className="w-px bg-slate-700" />
-        <div>
-          <p className="text-lg font-bold text-slate-50">第14〜17回</p>
-          <p className="text-xs text-slate-500">精神科専門医</p>
         </div>
       </div>
     </div>
