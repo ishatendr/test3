@@ -3608,9 +3608,10 @@ function HomeScreen({ onStart, wrongCount, starCount, navTab, onNavTab }) {
           </div>
         )}
 
-        
+      </div>
 
-            {/* ボトムタブバー */}
+
+      {/* ボトムタブバー */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700/50" style={{paddingBottom:"env(safe-area-inset-bottom)"}}>
         <div className="max-w-lg mx-auto flex">
           {TABS.map((t) => (
