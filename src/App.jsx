@@ -3556,6 +3556,16 @@ function HomeScreen({ onStart, wrongCount, starCount, navTab, onNavTab }) {
           <div className="w-px bg-slate-700" />
           <div><p className="text-xl font-bold text-slate-50">{starCount}</p><p className="text-xs text-slate-500">⭐要確認</p></div>
         </div>
+        {/* YouTubeバナー */}
+        <a href="https://www.youtube.com/channel/UC1jYjuINcToHLJzfi8PHG5g" target="_blank" rel="noopener noreferrer"
+          className="mt-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 transition-all">
+          <span className="text-2xl flex-shrink-0">▶️</span>
+          <div className="text-left">
+            <p className="text-sm font-semibold text-rose-300">分野別 音声解説チャンネル</p>
+            <p className="text-xs text-slate-400 mt-0.5">YouTube で解説動画を見る</p>
+          </div>
+          <span className="ml-auto text-slate-400 text-sm flex-shrink-0">→</span>
+        </a>
       </div>
 
       {/* コンテンツ */}
