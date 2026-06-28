@@ -3130,12 +3130,6 @@ const LS_STAR = "medApp_starIds";
 // 音声解説ファイル設定
 // ※ public/audio/ フォルダに m4a ファイルを置いてください
 // ============================================================
-const AUDIO_FILES = [
-  { cat: "心理検査・症候群", file: "https://drive.google.com/uc?export=download&id=1T17TLfqW5Rs4f6hooVBDG2X5hUfCt_AZ" },
-  { cat: "歴史・法律", file: "https://drive.google.com/uc?export=download&id=1ieZrUXbXdoJpQPDvgvEjm1t-DZouUrzk" },
-  // 追加する場合はここに書いてください
-  // { cat: "分野名", file: "https://drive.google.com/uc?export=download&id=ファイルID" },
-];
 
 // ============================================================
 // ユーティリティ
@@ -3241,7 +3235,7 @@ function stopSpeech() {
 // ============================================================
 export default function App() {
   const [screen, setScreen] = useState("home");
-  const [navTab, setNavTab] = useState("year"); // "year" | "category" | "lecture"
+  const [navTab, setNavTab] = useState("year"); // "year" | "category"
   const [mode, setMode] = useState(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [queue, setQueue] = useState([]);
@@ -3521,9 +3515,6 @@ export default function App() {
 function HomeScreen({ onStart, wrongCount, starCount, navTab, onNavTab }) {
   const [selectedMode, setSelectedMode] = useState("year2024");
   const [selectedCat, setSelectedCat] = useState(CATEGORY_LIST[0]);
-  const [playingCat, setPlayingCat] = useState(null);
-  const audioRef = useRef(null);
-
   const count2024 = SAMPLE_QUESTIONS.filter((q) => q.year === "2024").length;
   const count2023 = SAMPLE_QUESTIONS.filter((q) => q.year === "2023").length;
   const count2022 = SAMPLE_QUESTIONS.filter((q) => q.year === "2022").length;
@@ -3543,24 +3534,9 @@ function HomeScreen({ onStart, wrongCount, starCount, navTab, onNavTab }) {
     { id: "review", label: "復習モード", icon: "🔁", desc: `間違えた問題のみ（${wrongCount}問）` },
   ];
 
-  function handlePlayAudio(cat, file) {
-    if (playingCat === cat) {
-      audioRef.current?.pause();
-      setPlayingCat(null);
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = file;
-        audioRef.current.play().catch(() => {});
-      }
-      setPlayingCat(cat);
-    }
-  }
-
   const TABS = [
     { id: "year", label: "年度別", icon: "📅" },
-    { id: "category", label: "分野別問題", icon: "🏷️" },
-    { id: "lecture", label: "分野別解説", icon: "🎵" },
+    { id: "category", label: "分野別", icon: "🏷️" },
   ];
 
   return (
@@ -3632,46 +3608,9 @@ function HomeScreen({ onStart, wrongCount, starCount, navTab, onNavTab }) {
           </div>
         )}
 
-        {/* ── タブ3: 分野別解説 ── */}
-        {navTab === "lecture" && (
-          <div>
-            <audio ref={audioRef} onEnded={() => setPlayingCat(null)} />
-            {AUDIO_FILES.length === 0 ? (
-              <div className="text-center py-16 px-4">
-                <p className="text-4xl mb-4">🎵</p>
-                <p className="text-slate-300 font-semibold mb-2">音声解説を準備中</p>
-                <p className="text-slate-500 text-sm leading-relaxed">
-                  分野別の音声解説ファイルを順次追加予定です。
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {AUDIO_FILES.map(({ cat, file }) => (
-                  <div key={cat} className={`p-4 rounded-2xl border transition-all ${playingCat === cat ? "bg-emerald-500/15 border-emerald-500/50" : "bg-slate-800/60 border-slate-700/50"}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className={`font-semibold text-sm ${playingCat === cat ? "text-emerald-300" : "text-slate-200"}`}>{cat}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{catCounts[cat] || 0}問収録</p>
-                      </div>
-                      <button onClick={() => handlePlayAudio(cat, file)}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all active:scale-95 ${playingCat === cat ? "bg-emerald-500 text-slate-900" : "bg-slate-700 text-slate-200 hover:bg-slate-600"}`}>
-                        {playingCat === cat ? "⏸" : "▶"}
-                      </button>
-                    </div>
-                    {playingCat === cat && (
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className="animate-pulse text-emerald-400 text-xs">● 再生中</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+        
 
-      {/* ボトムタブバー */}
+            {/* ボトムタブバー */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700/50" style={{paddingBottom:"env(safe-area-inset-bottom)"}}>
         <div className="max-w-lg mx-auto flex">
           {TABS.map((t) => (
